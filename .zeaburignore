@@ -1,0 +1,7 @@
+target/
+node_modules/
+config/
+.git/
+*.log
+.DS_Store
+Thumbs.db

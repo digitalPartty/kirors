@@ -2,8 +2,10 @@
 //!
 //! 支持从 Kiro IDE 的凭证文件加载，使用 Social 认证方式
 //! 支持单凭据和多凭据配置格式
+//! 支持从环境变量加载凭据
 
 use serde::{Deserialize, Serialize};
+use std::env;
 use std::fs;
 use std::path::Path;
 
@@ -101,6 +103,46 @@ impl CredentialsConfig {
 
         let config = serde_json::from_str(&content)?;
         Ok(config)
+    }
+
+    /// 从环境变量加载凭据配置
+    ///
+    /// 支持两种方式：
+    /// 1. KIRO_CREDENTIALS - 完整的 JSON 字符串（单对象或数组）
+    /// 2. 单独的环境变量：
+    ///    - KIRO_REFRESH_TOKEN
+    ///    - KIRO_AUTH_METHOD (默认 "idc")
+    ///    - KIRO_CLIENT_ID
+    ///    - KIRO_CLIENT_SECRET
+    ///    - KIRO_CREDENTIAL_REGION
+    ///    - KIRO_CREDENTIAL_MACHINE_ID
+    ///    - KIRO_EXPIRES_AT
+    pub fn from_env() -> Option<Self> {
+        // 方式1：完整 JSON
+        if let Ok(json) = env::var("KIRO_CREDENTIALS") {
+            if let Ok(config) = serde_json::from_str(&json) {
+                return Some(config);
+            }
+        }
+
+        // 方式2：单独环境变量
+        let refresh_token = env::var("KIRO_REFRESH_TOKEN").ok()?;
+        
+        let cred = KiroCredentials {
+            id: None,
+            access_token: None,
+            refresh_token: Some(refresh_token),
+            profile_arn: None,
+            expires_at: env::var("KIRO_EXPIRES_AT").ok(),
+            auth_method: Some(env::var("KIRO_AUTH_METHOD").unwrap_or_else(|_| "idc".to_string())),
+            client_id: env::var("KIRO_CLIENT_ID").ok(),
+            client_secret: env::var("KIRO_CLIENT_SECRET").ok(),
+            priority: 0,
+            region: env::var("KIRO_CREDENTIAL_REGION").ok(),
+            machine_id: env::var("KIRO_CREDENTIAL_MACHINE_ID").ok(),
+        };
+
+        Some(CredentialsConfig::Single(cred))
     }
 
     /// 转换为按优先级排序的凭据列表

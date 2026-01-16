@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::env;
 use std::fs;
 use std::path::Path;
 
@@ -120,13 +121,68 @@ impl Config {
     /// 从文件加载配置
     pub fn load<P: AsRef<Path>>(path: P) -> anyhow::Result<Self> {
         let path = path.as_ref();
-        if !path.exists() {
+        let mut config = if !path.exists() {
             // 配置文件不存在，返回默认配置
-            return Ok(Self::default());
-        }
+            Self::default()
+        } else {
+            let content = fs::read_to_string(path)?;
+            serde_json::from_str(&content)?
+        };
 
-        let content = fs::read_to_string(path)?;
-        let config: Config = serde_json::from_str(&content)?;
+        // 环境变量覆盖配置文件
+        config.apply_env_overrides();
         Ok(config)
+    }
+
+    /// 从环境变量加载配置（不需要配置文件）
+    pub fn from_env() -> Self {
+        let mut config = Self::default();
+        config.apply_env_overrides();
+        config
+    }
+
+    /// 应用环境变量覆盖
+    fn apply_env_overrides(&mut self) {
+        if let Ok(v) = env::var("KIRO_HOST") {
+            self.host = v;
+        }
+        if let Ok(v) = env::var("KIRO_PORT") {
+            if let Ok(port) = v.parse() {
+                self.port = port;
+            }
+        }
+        if let Ok(v) = env::var("KIRO_REGION") {
+            self.region = v;
+        }
+        if let Ok(v) = env::var("KIRO_API_KEY") {
+            self.api_key = Some(v);
+        }
+        if let Ok(v) = env::var("KIRO_ADMIN_API_KEY") {
+            self.admin_api_key = Some(v);
+        }
+        if let Ok(v) = env::var("KIRO_PROXY_URL") {
+            self.proxy_url = Some(v);
+        }
+        if let Ok(v) = env::var("KIRO_PROXY_USERNAME") {
+            self.proxy_username = Some(v);
+        }
+        if let Ok(v) = env::var("KIRO_PROXY_PASSWORD") {
+            self.proxy_password = Some(v);
+        }
+        if let Ok(v) = env::var("KIRO_MACHINE_ID") {
+            self.machine_id = Some(v);
+        }
+        if let Ok(v) = env::var("KIRO_VERSION") {
+            self.kiro_version = v;
+        }
+        if let Ok(v) = env::var("KIRO_COUNT_TOKENS_API_URL") {
+            self.count_tokens_api_url = Some(v);
+        }
+        if let Ok(v) = env::var("KIRO_COUNT_TOKENS_API_KEY") {
+            self.count_tokens_api_key = Some(v);
+        }
+        if let Ok(v) = env::var("KIRO_COUNT_TOKENS_AUTH_TYPE") {
+            self.count_tokens_auth_type = v;
+        }
     }
 }

@@ -1,0 +1,8 @@
+{
+  "build": {
+    "type": "dockerfile"
+  },
+  "expose": {
+    "port": 8990
+  }
+}

@@ -38,14 +38,22 @@ async fn main() {
         std::process::exit(1);
     });
 
-    // 加载凭证（支持单对象或数组格式）
+    // 加载凭证：优先从环境变量，否则从文件
     let credentials_path = args
         .credentials
         .unwrap_or_else(|| KiroCredentials::default_credentials_path().to_string());
-    let credentials_config = CredentialsConfig::load(&credentials_path).unwrap_or_else(|e| {
-        tracing::error!("加载凭证失败: {}", e);
-        std::process::exit(1);
-    });
+    
+    let (credentials_config, credentials_path_for_save) = 
+        if let Some(env_config) = CredentialsConfig::from_env() {
+            tracing::info!("从环境变量加载凭据");
+            (env_config, None) // 环境变量模式不回写文件
+        } else {
+            let config = CredentialsConfig::load(&credentials_path).unwrap_or_else(|e| {
+                tracing::error!("加载凭证失败: {}", e);
+                std::process::exit(1);
+            });
+            (config, Some(credentials_path.clone()))
+        };
 
     // 判断是否为多凭据格式（用于刷新后回写）
     let is_multiple_format = credentials_config.is_multiple();
@@ -58,10 +66,11 @@ async fn main() {
     let first_credentials = credentials_list.first().cloned().unwrap_or_default();
     tracing::debug!("主凭证: {:?}", first_credentials);
 
-    // 获取 API Key
+    // 获取 API Key（如果未设置则生成一个默认的）
     let api_key = config.api_key.clone().unwrap_or_else(|| {
-        tracing::error!("配置文件中未设置 apiKey");
-        std::process::exit(1);
+        let default_key = format!("sk-kiro-{}", uuid::Uuid::new_v4().to_string().replace("-", ""));
+        tracing::warn!("未设置 apiKey，已自动生成: {}", &default_key);
+        default_key
     });
 
     // 构建代理配置
@@ -82,7 +91,7 @@ async fn main() {
         config.clone(),
         credentials_list,
         proxy_config.clone(),
-        Some(credentials_path.into()),
+        credentials_path_for_save.map(|p| p.into()),
         is_multiple_format,
     )
     .unwrap_or_else(|e| {
@@ -107,34 +116,32 @@ async fn main() {
         first_credentials.profile_arn.clone(),
     );
 
-    // 构建 Admin API 路由（如果配置了非空的 admin_api_key）
-    // 安全检查：空字符串被视为未配置，防止空 key 绕过认证
-    let admin_key_valid = config
-        .admin_api_key
-        .as_ref()
-        .map(|k| !k.trim().is_empty())
-        .unwrap_or(false);
+    // 构建 Admin API 路由
+    // 如果未配置 admin_api_key，自动生成一个并启用 Admin API
+    let admin_key = config.admin_api_key.clone().unwrap_or_else(|| {
+        let default_key = format!("sk-admin-{}", uuid::Uuid::new_v4().to_string().replace("-", ""));
+        tracing::warn!("未设置 adminApiKey，已自动生成: {}", &default_key);
+        default_key
+    });
 
-    let app = if let Some(admin_key) = &config.admin_api_key {
-        if admin_key.trim().is_empty() {
-            tracing::warn!("admin_api_key 配置为空，Admin API 未启用");
-            anthropic_app
-        } else {
-            let admin_service = admin::AdminService::new(token_manager.clone());
-            let admin_state = admin::AdminState::new(admin_key, admin_service);
-            let admin_app = admin::create_admin_router(admin_state);
+    let admin_key_valid = !admin_key.trim().is_empty();
 
-            // 创建 Admin UI 路由
-            let admin_ui_app = admin_ui::create_admin_ui_router();
-
-            tracing::info!("Admin API 已启用");
-            tracing::info!("Admin UI 已启用: /admin");
-            anthropic_app
-                .nest("/api/admin", admin_app)
-                .nest("/admin", admin_ui_app)
-        }
-    } else {
+    let app = if admin_key.trim().is_empty() {
+        tracing::warn!("admin_api_key 配置为空，Admin API 未启用");
         anthropic_app
+    } else {
+        let admin_service = admin::AdminService::new(token_manager.clone());
+        let admin_state = admin::AdminState::new(&admin_key, admin_service);
+        let admin_app = admin::create_admin_router(admin_state);
+
+        // 创建 Admin UI 路由
+        let admin_ui_app = admin_ui::create_admin_ui_router();
+
+        tracing::info!("Admin API 已启用");
+        tracing::info!("Admin UI 已启用: /admin");
+        anthropic_app
+            .nest("/api/admin", admin_app)
+            .nest("/admin", admin_ui_app)
     };
 
     // 启动服务器
