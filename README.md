@@ -152,6 +152,78 @@ cargo build --release
 ./target/release/kiro-rs -c /path/to/config.json --credentials /path/to/credentials.json
 ```
 
+## Docker 部署
+
+### 本地 Docker 部署
+
+```bash
+# 创建配置目录
+mkdir config
+
+# 创建配置文件 config/config.json 和 config/credentials.json
+
+# 构建镜像
+docker build -t kiro-rs .
+
+# 运行容器
+docker run -d \
+  --name kiro-rs \
+  -p 8990:8990 \
+  -v ./config:/app/config \
+  kiro-rs
+```
+
+### Zeabur 云部署
+
+支持通过环境变量配置，无需配置文件即可启动。
+
+#### 部署步骤
+
+1. Fork 或上传项目到 GitHub
+2. 在 Zeabur 创建项目，连接 GitHub 仓库
+3. 添加环境变量（见下方）
+4. 在「网络」中配置域名，端口填 `8990`
+5. 访问 `https://你的域名/admin` 进入管理页面
+
+#### 环境变量配置
+
+| 变量名 | 必填 | 说明 |
+|--------|------|------|
+| `KIRO_HOST` | 是 | 监听地址，填 `0.0.0.0` |
+| `KIRO_PORT` | 否 | 监听端口，默认 `8080` |
+| `KIRO_API_KEY` | 否 | API 密钥，不填则自动生成 |
+| `KIRO_ADMIN_API_KEY` | 否 | Admin API 密钥，不填则自动生成 |
+| `KIRO_REGION` | 否 | AWS 区域，默认 `us-east-1` |
+| `KIRO_PROXY_URL` | 否 | HTTP/SOCKS5 代理地址 |
+
+凭据配置（二选一）：
+
+**方式一：单独变量**
+
+| 变量名 | 说明 |
+|--------|------|
+| `KIRO_REFRESH_TOKEN` | 刷新令牌 |
+| `KIRO_AUTH_METHOD` | 认证方式：`social` 或 `idc` |
+| `KIRO_CLIENT_ID` | IdC 客户端 ID（idc 方式必填） |
+| `KIRO_CLIENT_SECRET` | IdC 客户端密钥（idc 方式必填） |
+| `KIRO_CREDENTIAL_REGION` | 凭据区域 |
+| `KIRO_EXPIRES_AT` | 过期时间 |
+
+**方式二：JSON 变量**
+
+```
+KIRO_CREDENTIALS={"refreshToken":"xxx","authMethod":"idc","clientId":"xxx","clientSecret":"xxx","region":"us-east-1","expiresAt":"2026-12-31T00:00:00Z"}
+```
+
+#### 最小配置示例
+
+```
+KIRO_HOST=0.0.0.0
+KIRO_PORT=8990
+```
+
+服务启动后会自动生成 API Key 和 Admin Key（在日志中查看），然后通过 Admin UI 页面添加凭据。
+
 ### 5. 使用 API
 
 ```bash
