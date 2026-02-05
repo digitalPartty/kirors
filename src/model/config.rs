@@ -3,6 +3,19 @@ use std::env;
 use std::fs;
 use std::path::Path;
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum TlsBackend {
+    Rustls,
+    NativeTls,
+}
+
+impl Default for TlsBackend {
+    fn default() -> Self {
+        Self::Rustls
+    }
+}
+
 /// KNA 应用配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -30,6 +43,9 @@ pub struct Config {
 
     #[serde(default = "default_node_version")]
     pub node_version: String,
+
+    #[serde(default = "default_tls_backend")]
+    pub tls_backend: TlsBackend,
 
     /// 外部 count_tokens API 地址（可选）
     #[serde(default)]
@@ -90,6 +106,10 @@ fn default_count_tokens_auth_type() -> String {
     "x-api-key".to_string()
 }
 
+fn default_tls_backend() -> TlsBackend {
+    TlsBackend::Rustls
+}
+
 impl Default for Config {
     fn default() -> Self {
         Self {
@@ -101,6 +121,7 @@ impl Default for Config {
             api_key: None,
             system_version: default_system_version(),
             node_version: default_node_version(),
+            tls_backend: default_tls_backend(),
             count_tokens_api_url: None,
             count_tokens_api_key: None,
             count_tokens_auth_type: default_count_tokens_auth_type(),

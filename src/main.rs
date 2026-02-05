@@ -24,8 +24,8 @@ async fn main() {
     // 初始化日志
     tracing_subscriber::fmt()
         .with_env_filter(
-            tracing_subscriber::EnvFilter::from_default_env()
-                .add_directive(tracing::Level::INFO.into()),
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info")),
         )
         .init();
 
@@ -107,6 +107,7 @@ async fn main() {
         api_key: config.count_tokens_api_key.clone(),
         auth_type: config.count_tokens_auth_type.clone(),
         proxy: proxy_config,
+        tls_backend: config.tls_backend,
     });
 
     // 构建 Anthropic API 路由（从第一个凭据获取 profile_arn）
