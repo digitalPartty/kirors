@@ -141,6 +141,19 @@ impl KiroProvider {
             .map(|s| s.to_string())
     }
 
+    /// 将凭据的 profile_arn 注入到请求体 JSON 中
+    fn inject_profile_arn(request_body: &str, profile_arn: &Option<String>) -> String {
+        if let Some(arn) = profile_arn {
+            if let Ok(mut json) = serde_json::from_str::<serde_json::Value>(request_body) {
+                json["profileArn"] = serde_json::Value::String(arn.clone());
+                if let Ok(body) = serde_json::to_string(&json) {
+                    return body;
+                }
+            }
+        }
+        request_body.to_string()
+    }
+
     /// 发送非流式 API 请求
     ///
     /// 支持多凭据故障转移：
@@ -374,11 +387,14 @@ impl KiroProvider {
                 config.system_version, config.node_version, config.kiro_version, machine_id
             );
 
+            // 注入实际凭据的 profile_arn 到请求体
+            let body = Self::inject_profile_arn(request_body, &ctx.credentials.profile_arn);
+
             // 发送请求
             let response = match self
                 .client_for(&ctx.credentials)?
                 .post(&url)
-                .body(request_body.to_string())
+                .body(body)
                 .header("content-type", "application/json")
                 .header("x-amzn-codewhisperer-optout", "true")
                 .header("x-amzn-kiro-agent-mode", "vibe")
@@ -619,5 +635,47 @@ mod tests {
     fn test_is_monthly_request_limit_false() {
         let body = r#"{"message":"nope","reason":"DAILY_REQUEST_COUNT"}"#;
         assert!(!KiroProvider::is_monthly_request_limit(body));
+    }
+
+    #[test]
+    fn test_inject_profile_arn_with_some() {
+        let body = r#"{"conversationState":{"conversationId":"c1"}}"#;
+        let arn = Some("arn:aws:codewhisperer:us-east-1:123:profile/ABC".to_string());
+        let result = KiroProvider::inject_profile_arn(body, &arn);
+        let json: serde_json::Value = serde_json::from_str(&result).unwrap();
+        assert_eq!(
+            json["profileArn"],
+            "arn:aws:codewhisperer:us-east-1:123:profile/ABC"
+        );
+        // 原有字段保留
+        assert_eq!(json["conversationState"]["conversationId"], "c1");
+    }
+
+    #[test]
+    fn test_inject_profile_arn_with_none() {
+        let body = r#"{"conversationState":{"conversationId":"c1"}}"#;
+        let result = KiroProvider::inject_profile_arn(body, &None);
+        // 不注入 profileArn，原样返回
+        let json: serde_json::Value = serde_json::from_str(&result).unwrap();
+        assert!(json.get("profileArn").is_none());
+        assert_eq!(json["conversationState"]["conversationId"], "c1");
+    }
+
+    #[test]
+    fn test_inject_profile_arn_overwrites_existing() {
+        let body = r#"{"conversationState":{},"profileArn":"old-arn"}"#;
+        let arn = Some("new-arn".to_string());
+        let result = KiroProvider::inject_profile_arn(body, &arn);
+        let json: serde_json::Value = serde_json::from_str(&result).unwrap();
+        assert_eq!(json["profileArn"], "new-arn");
+    }
+
+    #[test]
+    fn test_inject_profile_arn_invalid_json() {
+        let body = "not-valid-json";
+        let arn = Some("arn:test".to_string());
+        let result = KiroProvider::inject_profile_arn(body, &arn);
+        // 解析失败时原样返回
+        assert_eq!(result, "not-valid-json");
     }
 }
