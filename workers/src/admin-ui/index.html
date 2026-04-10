@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kiro Admin - Credential Management</title>
+    <link rel="stylesheet" href="/admin/styles.css">
+</head>
+<body>
+    <!-- Login Page -->
+    <div id="login-page" class="page">
+        <div class="login-container">
+            <h1>Kiro Admin</h1>
+            <p class="subtitle">Credential Management Portal</p>
+            <form id="login-form">
+                <div class="form-group">
+                    <label for="admin-key">Admin API Key</label>
+                    <input 
+                        type="password" 
+                        id="admin-key" 
+                        placeholder="Enter your admin API key"
+                        required
+                    >
+                </div>
+                <button type="submit" class="btn btn-primary">Login</button>
+                <div id="login-error" class="error-message"></div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Dashboard Page -->
+    <div id="dashboard-page" class="page hidden">
+        <header class="dashboard-header">
+            <h1>Credential Management</h1>
+            <button id="logout-btn" class="btn btn-secondary">Logout</button>
+        </header>
+
+        <div class="dashboard-content">
+            <!-- Add Credential Section -->
+            <section class="card">
+                <h2>Add New Credential</h2>
+                <form id="add-credential-form">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="access-token">Access Token *</label>
+                            <input 
+                                type="text" 
+                                id="access-token" 
+                                placeholder="Enter access token"
+                                required
+                            >
+                        </div>
+                        <div class="form-group">
+                            <label for="refresh-token">Refresh Token</label>
+                            <input 
+                                type="text" 
+                                id="refresh-token" 
+                                placeholder="Enter refresh token (optional)"
+                            >
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="priority">Priority *</label>
+                            <input 
+                                type="number" 
+                                id="priority" 
+                                placeholder="1-100"
+                                min="1"
+                                max="100"
+                                value="50"
+                                required
+                            >
+                        </div>
+                        <div class="form-group">
+                            <label for="expires-at">Expires At</label>
+                            <input 
+                                type="datetime-local" 
+                                id="expires-at"
+                            >
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Add Credential</button>
+                </form>
+            </section>
+
+            <!-- Credentials List Section -->
+            <section class="card">
+                <div class="section-header">
+                    <h2>Credentials</h2>
+                    <button id="refresh-btn" class="btn btn-secondary">Refresh</button>
+                </div>
+                <div id="credentials-container">
+                    <div class="loading">Loading credentials...</div>
+                </div>
+            </section>
+        </div>
+
+        <!-- Toast Notifications -->
+        <div id="toast-container"></div>
+    </div>
+
+    <script src="/admin/app.js"></script>
+</body>
+</html>

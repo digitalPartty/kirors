@@ -1,0 +1,60 @@
+name = "kiro-workers"
+main = "src/index.ts"
+compatibility_date = "2024-01-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Environment variables
+[vars]
+KIRO_REGION = "us-east-1"
+KIRO_VERSION = "0.8.0"
+SYSTEM_VERSION = "darwin#24.6.0"
+NODE_VERSION = "22.21.1"
+
+# Workers KV namespace for credential storage
+[[kv_namespaces]]
+binding = "CREDENTIALS_KV"
+id = "placeholder_credentials_kv_id"
+preview_id = "placeholder_credentials_kv_preview_id"
+
+# Durable Object bindings for token management
+[[durable_objects.bindings]]
+name = "TOKEN_MANAGER"
+class_name = "TokenManager"
+script_name = "kiro-workers"
+
+[[migrations]]
+tag = "v1"
+new_classes = ["TokenManager"]
+
+# Secrets (set via wrangler secret put)
+# - KIRO_API_KEY: API key for authenticating client requests
+# - ADMIN_API_KEY: API key for admin endpoints
+# - COUNT_TOKENS_API_URL: Optional external token counting API
+# - COUNT_TOKENS_API_KEY: Optional API key for token counting service
+# - PROXY_URL: Optional HTTP/SOCKS5 proxy URL
+# - PROXY_USERNAME: Optional proxy authentication username
+# - PROXY_PASSWORD: Optional proxy authentication password
+
+[build]
+command = "npm run build"
+
+# Text-based assets to be bundled as text
+[build.upload]
+format = "modules"
+
+[[rules]]
+type = "Text"
+globs = ["**/*.html", "**/*.css", "**/*.js"]
+fallthrough = true
+
+[env.production]
+name = "kiro-workers-production"
+kv_namespaces = [
+  { binding = "CREDENTIALS_KV", id = "production_credentials_kv_id" }
+]
+
+[env.staging]
+name = "kiro-workers-staging"
+kv_namespaces = [
+  { binding = "CREDENTIALS_KV", id = "staging_credentials_kv_id" }
+]
