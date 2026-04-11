@@ -78,7 +78,7 @@ export class TokenManager {
 
     // Build credential map with runtime state
     this.credentials.clear();
-    for (const credential of credentialList) {
+    for (const credential of credentialList.credentials) {
       this.credentials.set(credential.id, {
         credential,
         failureCount: failureCounts[credential.id] || 0,
@@ -125,12 +125,21 @@ export class TokenManager {
   /**
    * Check if a token is expired or expiring soon
    * 
-   * @param expiresAt - Token expiration timestamp in milliseconds
+   * @param expiresAt - Token expiration timestamp (RFC3339 string or milliseconds)
    * @param threshold - Time threshold in milliseconds
    * @returns true if token expires within threshold
    */
-  private isTokenExpiring(expiresAt: number, threshold: number): boolean {
-    return expiresAt <= Date.now() + threshold;
+  private isTokenExpiring(expiresAt: string | number | undefined, threshold: number): boolean {
+    if (!expiresAt) {
+      return true; // No expiration time means expired
+    }
+    
+    // Convert to milliseconds if it's a string (RFC3339)
+    const expiresAtMs = typeof expiresAt === 'string' 
+      ? new Date(expiresAt).getTime() 
+      : expiresAt;
+    
+    return expiresAtMs <= Date.now() + threshold;
   }
 
   /**
@@ -151,7 +160,7 @@ export class TokenManager {
   /**
    * Refresh an OAuth token with retry logic
    * 
-   * Calls the appropriate OAuth endpoint based on credential type
+   * Calls the appropriate OAuth endpoint based on credential type (Social or IdC)
    * and updates the credential in KV storage. Retries up to 3 times
    * on failure before giving up.
    * 
@@ -162,19 +171,41 @@ export class TokenManager {
    * @throws Error if all retry attempts fail
    */
   private async refreshToken(credential: Credential): Promise<Credential> {
-    const region = this.env.KIRO_REGION || "us-east-1";
+    // Determine auth method (default to "social" if not specified)
+    const authMethod = credential.authMethod?.toLowerCase() || "social";
+    
+    // Use credential-level region if available, otherwise fall back to env region
+    const region = credential.region || this.env.KIRO_REGION || "us-east-1";
+    
+    // Route to appropriate refresh method
+    if (authMethod === "idc" || authMethod === "builder-id" || authMethod === "iam") {
+      return this.refreshIdcToken(credential, region);
+    } else {
+      return this.refreshSocialToken(credential, region);
+    }
+  }
+
+  /**
+   * Refresh Social OAuth token
+   * 
+   * @param credential - Credential to refresh
+   * @param region - AWS region for the refresh endpoint
+   * @returns Updated credential with new access token
+   */
+  private async refreshSocialToken(credential: Credential, region: string): Promise<Credential> {
     const refreshUrl = `https://prod.${region}.auth.desktop.kiro.dev/refreshToken`;
     const maxRetries = 3;
     let lastError: Error | null = null;
 
-    // Retry up to 3 times
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
         const response = await fetch(refreshUrl, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "Accept": "application/json",
+            "Accept": "application/json, text/plain, */*",
+            "Accept-Encoding": "gzip, compress, deflate, br",
+            "Connection": "close",
           },
           body: JSON.stringify({
             refresh_token: credential.refreshToken,
@@ -183,7 +214,96 @@ export class TokenManager {
 
         if (!response.ok) {
           const errorText = await response.text();
-          throw new Error(`Token refresh failed: ${response.status} ${errorText}`);
+          throw new Error(`Social token refresh failed: ${response.status} ${errorText}`);
+        }
+
+        const data = await response.json() as {
+          access_token: string;
+          refresh_token?: string;
+          profile_arn?: string;
+          expires_in?: number;
+        };
+
+        const now = Date.now();
+        const expiresAt = data.expires_in ? now + (data.expires_in * 1000) : now + (3600 * 1000);
+
+        const updatedCredential: Credential = {
+          ...credential,
+          accessToken: data.access_token,
+          refreshToken: data.refresh_token || credential.refreshToken,
+          profileArn: data.profile_arn || credential.profileArn,
+          expiresAt: new Date(expiresAt).toISOString(),
+          updatedAt: now,
+        };
+
+        // Persist to KV
+        await this.credentialStore.update(credential.id, {
+          accessToken: updatedCredential.accessToken,
+          refreshToken: updatedCredential.refreshToken,
+          profileArn: updatedCredential.profileArn,
+          expiresAt: updatedCredential.expiresAt,
+          updatedAt: updatedCredential.updatedAt,
+        });
+
+        logTokenRefresh(credential.id, "success", attempt);
+        return updatedCredential;
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error(String(error));
+        logTokenRefresh(credential.id, "failure", attempt, lastError.message);
+
+        if (attempt < maxRetries) {
+          await new Promise(resolve => setTimeout(resolve, attempt * 1000));
+        }
+      }
+    }
+
+    throw new Error(
+      `Social token refresh failed after ${maxRetries} attempts for credential ${credential.id}: ${lastError?.message}`
+    );
+  }
+
+  /**
+   * Refresh IdC (AWS SSO OIDC) token
+   * 
+   * @param credential - Credential to refresh
+   * @param region - AWS region for the OIDC endpoint
+   * @returns Updated credential with new access token
+   */
+  private async refreshIdcToken(credential: Credential, region: string): Promise<Credential> {
+    if (!credential.clientId || !credential.clientSecret) {
+      throw new Error("IdC refresh requires clientId and clientSecret");
+    }
+
+    const refreshUrl = `https://oidc.${region}.amazonaws.com/token`;
+    const maxRetries = 3;
+    let lastError: Error | null = null;
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        const response = await fetch(refreshUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Host": `oidc.${region}.amazonaws.com`,
+            "Connection": "keep-alive",
+            "x-amz-user-agent": "aws-sdk-js/3.738.0 ua/2.1 os/other lang/js md/browser#unknown_unknown api/sso-oidc#3.738.0 m/E KiroIDE",
+            "Accept": "*/*",
+            "Accept-Language": "*",
+            "sec-fetch-mode": "cors",
+            "User-Agent": "node",
+            "Accept-Encoding": "br, gzip, deflate",
+          },
+          body: JSON.stringify({
+            client_id: credential.clientId,
+            client_secret: credential.clientSecret,
+            refresh_token: credential.refreshToken,
+            grant_type: "refresh_token",
+          }),
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`IdC token refresh failed: ${response.status} ${errorText}`);
         }
 
         const data = await response.json() as {
@@ -192,7 +312,6 @@ export class TokenManager {
           expires_in?: number;
         };
 
-        // Update credential with new token
         const now = Date.now();
         const expiresAt = data.expires_in ? now + (data.expires_in * 1000) : now + (3600 * 1000);
 
@@ -200,7 +319,7 @@ export class TokenManager {
           ...credential,
           accessToken: data.access_token,
           refreshToken: data.refresh_token || credential.refreshToken,
-          expiresAt,
+          expiresAt: new Date(expiresAt).toISOString(),
           updatedAt: now,
         };
 
@@ -212,33 +331,20 @@ export class TokenManager {
           updatedAt: updatedCredential.updatedAt,
         });
 
-        // Log successful token refresh
         logTokenRefresh(credential.id, "success", attempt);
-        
         return updatedCredential;
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error));
-        
-        // Log failed token refresh attempt
-        logTokenRefresh(
-          credential.id,
-          "failure",
-          attempt,
-          lastError.message
-        );
+        logTokenRefresh(credential.id, "failure", attempt, lastError.message);
 
-        // If this isn't the last attempt, wait before retrying
         if (attempt < maxRetries) {
-          // Exponential backoff: 1s, 2s
-          const delayMs = attempt * 1000;
-          await new Promise(resolve => setTimeout(resolve, delayMs));
+          await new Promise(resolve => setTimeout(resolve, attempt * 1000));
         }
       }
     }
 
-    // All retries failed
     throw new Error(
-      `Token refresh failed after ${maxRetries} attempts for credential ${credential.id}: ${lastError?.message}`
+      `IdC token refresh failed after ${maxRetries} attempts for credential ${credential.id}: ${lastError?.message}`
     );
   }
 
@@ -306,7 +412,7 @@ export class TokenManager {
       // Return call context
       return {
         id: credential.id,
-        accessToken: credential.accessToken,
+        accessToken: credential.accessToken || "",
         credentials: credential,
       };
     }
@@ -414,6 +520,10 @@ export class TokenManager {
     entry.failureCount++;
     this.credentials.set(credentialId, entry);
 
+    console.warn(
+      `Credential ${credentialId} API call failed (${entry.failureCount}/${MAX_FAILURES_PER_CREDENTIAL})`
+    );
+
     // Check if threshold reached
     if (entry.failureCount >= MAX_FAILURES_PER_CREDENTIAL) {
       // Log credential disabled due to failures
@@ -432,6 +542,58 @@ export class TokenManager {
       if (this.currentCredentialId === credentialId) {
         this.selectNextCredential();
       }
+    }
+
+    // Persist failure counts
+    await this.persistFailureCounts();
+
+    return this.hasAvailableCredentials();
+  }
+
+  /**
+   * Report quota exhausted for a credential
+   * 
+   * Immediately disables the credential (used for 402 MONTHLY_REQUEST_COUNT errors)
+   * and switches to the next available credential.
+   * 
+   * **Validates: Requirements 4.3, 4.5**
+   * 
+   * @param credentialId - ID of the credential that exhausted quota
+   * @returns true if there are still available credentials, false otherwise
+   */
+  async reportQuotaExhausted(credentialId: string): Promise<boolean> {
+    await this.initialize();
+
+    const entry = this.credentials.get(credentialId);
+    if (!entry) {
+      return this.hasAvailableCredentials();
+    }
+
+    if (entry.credential.disabled) {
+      return this.hasAvailableCredentials();
+    }
+
+    // Immediately disable credential
+    entry.credential.disabled = true;
+    entry.failureCount = MAX_FAILURES_PER_CREDENTIAL; // Set to threshold for visibility
+    this.credentials.set(credentialId, entry);
+
+    console.error(`Credential ${credentialId} quota exhausted (MONTHLY_REQUEST_COUNT), disabled`);
+
+    // Log credential disabled due to quota
+    logCredentialFailover(
+      credentialId,
+      null,
+      "quota_exhausted",
+      entry.failureCount
+    );
+
+    // Disable credential in KV
+    await this.credentialStore.update(credentialId, { disabled: true });
+
+    // Select next credential if this was current
+    if (this.currentCredentialId === credentialId) {
+      this.selectNextCredential();
     }
 
     // Persist failure counts
@@ -493,6 +655,14 @@ export class TokenManager {
       if (path === "/reportFailure" && request.method === "POST") {
         const { credentialId } = await request.json() as { credentialId: string };
         const hasAvailable = await this.reportFailure(credentialId);
+        return new Response(JSON.stringify({ success: true, hasAvailable }), {
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+
+      if (path === "/reportQuotaExhausted" && request.method === "POST") {
+        const { credentialId } = await request.json() as { credentialId: string };
+        const hasAvailable = await this.reportQuotaExhausted(credentialId);
         return new Response(JSON.stringify({ success: true, hasAvailable }), {
           headers: { "Content-Type": "application/json" },
         });

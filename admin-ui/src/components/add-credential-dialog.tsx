@@ -97,6 +97,9 @@ export function AddCredentialDialog({ open, onOpenChange }: AddCredentialDialogP
                 onChange={(e) => setRefreshToken(e.target.value)}
                 disabled={isPending}
               />
+              <p className="text-xs text-muted-foreground">
+                用于刷新 Access Token 的凭据
+              </p>
             </div>
 
             {/* 认证方式 */}
@@ -111,22 +114,28 @@ export function AddCredentialDialog({ open, onOpenChange }: AddCredentialDialogP
                 disabled={isPending}
                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                <option value="social">Social</option>
-                <option value="idc">IdC/Builder-ID/IAM</option>
+                <option value="social">Social（社交账号登录）</option>
+                <option value="idc">IdC/Builder-ID/IAM（企业身份认证）</option>
               </select>
+              <p className="text-xs text-muted-foreground">
+                选择与 Refresh Token 对应的认证方式
+              </p>
             </div>
 
             <div className="space-y-2">
               <label htmlFor="region" className="text-sm font-medium">
-                刷新 Token 地域
+                Region（地域）
               </label>
               <Input
                 id="region"
-                placeholder="例如 us-east-1（留空则使用全局 region）"
+                placeholder="例如 us-east-1（留空则使用全局配置）"
                 value={region}
                 onChange={(e) => setRegion(e.target.value)}
                 disabled={isPending}
               />
+              <p className="text-xs text-muted-foreground">
+                用于 OIDC Token 刷新的 AWS 地域
+              </p>
             </div>
 
             {/* IdC/Builder-ID/IAM 额外字段 */}
@@ -138,11 +147,14 @@ export function AddCredentialDialog({ open, onOpenChange }: AddCredentialDialogP
                   </label>
                   <Input
                     id="clientId"
-                    placeholder="请输入 Client ID"
+                    placeholder="请输入 OIDC Client ID"
                     value={clientId}
                     onChange={(e) => setClientId(e.target.value)}
                     disabled={isPending}
                   />
+                  <p className="text-xs text-muted-foreground">
+                    OIDC 应用的客户端标识符
+                  </p>
                 </div>
                 <div className="space-y-2">
                   <label htmlFor="clientSecret" className="text-sm font-medium">
@@ -151,11 +163,14 @@ export function AddCredentialDialog({ open, onOpenChange }: AddCredentialDialogP
                   <Input
                     id="clientSecret"
                     type="password"
-                    placeholder="请输入 Client Secret"
+                    placeholder="请输入 OIDC Client Secret"
                     value={clientSecret}
                     onChange={(e) => setClientSecret(e.target.value)}
                     disabled={isPending}
                   />
+                  <p className="text-xs text-muted-foreground">
+                    OIDC 应用的客户端密钥
+                  </p>
                 </div>
               </>
             )}

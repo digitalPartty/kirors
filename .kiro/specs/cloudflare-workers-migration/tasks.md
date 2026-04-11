@@ -26,7 +26,7 @@ This plan outlines the migration of the kiro-rs Anthropic Claude API proxy from 
     - Test credential serialization and deserialization
     - _Requirements: 18.1, 18.2, 18.3, 18.4_
 
-- [ ] 3. Implement Token Manager Durable Object
+- [x] 3. Implement Token Manager Durable Object
   - [x] 3.1 Create TokenManager Durable Object class
     - Implement state management for credentials list and failure tracking
     - Add acquireContext() method to select credential by priority
@@ -51,7 +51,7 @@ This plan outlines the migration of the kiro-rs Anthropic Claude API proxy from 
 - [x] 4. Checkpoint - Verify credential and token management
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 5. Implement AWS Event Stream binary protocol decoder
+- [x] 5. Implement AWS Event Stream binary protocol decoder
   - [x] 5.1 Create EventStreamDecoder class
     - Implement frame parsing according to AWS Event Stream specification
     - Add buffer management for partial frames across chunks
@@ -67,7 +67,7 @@ This plan outlines the migration of the kiro-rs Anthropic Claude API proxy from 
     - Test malformed frame error handling
     - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5_
 
-- [ ] 6. Implement Kiro event to Anthropic SSE conversion
+- [x] 6. Implement Kiro event to Anthropic SSE conversion
   - [x] 6.1 Create SSEBuilder class with state machine
     - Define state machine for message lifecycle (idle, message_started, content_block_active, message_complete)
     - Implement processKiroEvent() method to handle all Kiro event types
@@ -171,7 +171,7 @@ This plan outlines the migration of the kiro-rs Anthropic Claude API proxy from 
     - Test error handling for upstream failures
     - _Requirements: 1.2, 1.4, 1.5_
 
-- [~] 11. Checkpoint - Verify core API functionality
+- [x] 11. Checkpoint - Verify core API functionality
   - Ensure all tests pass, ask the user if questions arise.
 
 - [x] 12. Implement WebSearch MCP tool integration
@@ -225,7 +225,7 @@ This plan outlines the migration of the kiro-rs Anthropic Claude API proxy from 
     - Test ping event emission timing
     - _Requirements: 20.1, 20.2, 20.3, 20.4, 20.5_
 
-- [~] 15. Checkpoint - Verify all API endpoints
+- [x] 15. Checkpoint - Verify all API endpoints
   - Ensure all tests pass, ask the user if questions arise.
 
 - [x] 16. Implement Admin API endpoints
@@ -306,11 +306,11 @@ This plan outlines the migration of the kiro-rs Anthropic Claude API proxy from 
     - Serve CSS and JavaScript assets
     - _Requirements: 11.1_
 
-- [~] 20. Checkpoint - Verify admin interface
+- [x] 20. Checkpoint - Verify admin interface
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 21. Wire all components together and create main worker entry point
-  - [~] 21.1 Create main worker fetch handler
+- [x] 21. Wire all components together and create main worker entry point
+  - [x] 21.1 Create main worker fetch handler
     - Set up request router for all endpoints
     - Wire authentication middleware
     - Connect all API handlers (models, messages, count_tokens, admin)
@@ -319,7 +319,7 @@ This plan outlines the migration of the kiro-rs Anthropic Claude API proxy from 
     - Handle CORS headers if needed
     - _Requirements: 1.1, 1.2, 1.3, 1.4, 2.1, 2.2, 2.3, 2.4, 2.5_
   
-  - [~] 21.2 Add environment variable configuration
+  - [x] 21.2 Add environment variable configuration
     - Load API keys from environment
     - Load AWS region from environment
     - Load Kiro API endpoints from environment
@@ -327,7 +327,7 @@ This plan outlines the migration of the kiro-rs Anthropic Claude API proxy from 
     - Load token counting API endpoint from environment (optional)
     - _Requirements: 15.4, 15.5_
   
-  - [~] 21.3 Write end-to-end integration tests
+  - [x] 21.3 Write end-to-end integration tests
     - Test complete request flow from client to Kiro API
     - Test streaming with binary event stream parsing
     - Test credential failover scenario
@@ -335,7 +335,7 @@ This plan outlines the migration of the kiro-rs Anthropic Claude API proxy from 
     - Test Admin API operations
     - _Requirements: 1.1, 1.2, 1.4, 4.3, 9.1, 9.2, 12.1, 12.2_
 
-- [~] 22. Final checkpoint - Complete system verification
+- [x] 22. Final checkpoint - Complete system verification
   - Ensure all tests pass, ask the user if questions arise.
 
 ## Notes

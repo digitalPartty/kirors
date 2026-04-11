@@ -1,3 +1,8 @@
+/**
+ * Admin API 客户端
+ * 用于管理凭据的增删改查操作
+ */
+
 import axios from 'axios'
 import { storage } from '@/lib/storage'
 import type {
@@ -18,7 +23,7 @@ const api = axios.create({
   },
 })
 
-// 请求拦截器添加 API Key
+// 请求拦截器：自动添加 API Key
 api.interceptors.request.use((config) => {
   const apiKey = storage.getApiKey()
   if (apiKey) {

@@ -13,8 +13,8 @@ NODE_VERSION = "22.21.1"
 # Workers KV namespace for credential storage
 [[kv_namespaces]]
 binding = "CREDENTIALS_KV"
-id = "placeholder_credentials_kv_id"
-preview_id = "placeholder_credentials_kv_preview_id"
+id = "42c0c509212b4668ba769192f72ec4d3"
+preview_id = "63189d29be4e41c0b544664bbc29eb56"
 
 # Durable Object bindings for token management
 [[durable_objects.bindings]]
@@ -24,7 +24,7 @@ script_name = "kiro-workers"
 
 [[migrations]]
 tag = "v1"
-new_classes = ["TokenManager"]
+new_sqlite_classes = ["TokenManager"]
 
 # Secrets (set via wrangler secret put)
 # - KIRO_API_KEY: API key for authenticating client requests
@@ -35,13 +35,7 @@ new_classes = ["TokenManager"]
 # - PROXY_USERNAME: Optional proxy authentication username
 # - PROXY_PASSWORD: Optional proxy authentication password
 
-[build]
-command = "npm run build"
-
 # Text-based assets to be bundled as text
-[build.upload]
-format = "modules"
-
 [[rules]]
 type = "Text"
 globs = ["**/*.html", "**/*.css", "**/*.js"]

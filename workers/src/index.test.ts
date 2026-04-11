@@ -70,7 +70,7 @@ describe("Worker Entry Point - End-to-End Integration", () => {
 
       expect(response.status).toBe(204);
       expect(response.headers.get("Access-Control-Allow-Origin")).toBe("*");
-      expect(response.headers.get("Access-Control-Allow-Methods")).toBe("GET, POST, OPTIONS");
+      expect(response.headers.get("Access-Control-Allow-Methods")).toBe("GET, POST, DELETE, OPTIONS");
       expect(response.headers.get("Access-Control-Allow-Headers")).toContain("x-api-key");
     });
   });

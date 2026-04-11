@@ -100,6 +100,36 @@ export async function handleMessages(request: Request, env: Env): Promise<Respon
 }
 
 /**
+ * Check if error response indicates monthly request limit exceeded
+ * 
+ * @param errorText - Error response text from Kiro API
+ * @returns true if error is MONTHLY_REQUEST_COUNT
+ */
+function isMonthlyRequestLimit(errorText: string): boolean {
+  if (errorText.includes("MONTHLY_REQUEST_COUNT")) {
+    return true;
+  }
+
+  try {
+    const errorJson = JSON.parse(errorText);
+    
+    // Check top-level reason field
+    if (errorJson.reason === "MONTHLY_REQUEST_COUNT") {
+      return true;
+    }
+    
+    // Check nested error.reason field
+    if (errorJson.error?.reason === "MONTHLY_REQUEST_COUNT") {
+      return true;
+    }
+  } catch {
+    // Not JSON, ignore
+  }
+
+  return false;
+}
+
+/**
  * Handle non-streaming message request
  * 
  * **Validates: Requirements 1.2, 1.5, 17.1-17.5**
@@ -166,12 +196,32 @@ async function handleNonStreamingRequest(body: MessagesRequest, env: Env): Promi
         context.id
       );
       
-      // Report failure to TokenManager
-      await tokenManager.fetch(new Request("http://internal/reportFailure", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ credentialId: context.id }),
-      }));
+      // Check for 402 quota exhausted
+      if (kiroResponse.status === 402 && isMonthlyRequestLimit(errorText)) {
+        // Report quota exhausted to TokenManager
+        const quotaResponse = await tokenManager.fetch(new Request("http://internal/reportQuotaExhausted", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ credentialId: context.id }),
+        }));
+        
+        const { hasAvailable } = await quotaResponse.json() as { hasAvailable: boolean };
+        
+        if (!hasAvailable) {
+          // All credentials exhausted
+          return createCredentialExhaustedError("All credentials have exhausted their quota");
+        }
+        
+        // Retry with next credential would happen in a retry loop
+        // For now, return the error
+      } else {
+        // Report failure to TokenManager for other errors
+        await tokenManager.fetch(new Request("http://internal/reportFailure", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ credentialId: context.id }),
+        }));
+      }
       
       // **Validates: Requirement 13.1**
       const convertedError = convertKiroError(kiroResponse.status, errorText);
@@ -407,12 +457,37 @@ async function handleStreamingRequest(body: MessagesRequest, env: Env): Promise<
           context.id
         );
         
-        // Report failure to TokenManager
-        await tokenManager.fetch(new Request("http://internal/reportFailure", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ credentialId: context.id }),
-        }));
+        // Check for 402 quota exhausted
+        if (kiroResponse.status === 402 && isMonthlyRequestLimit(errorText)) {
+          // Report quota exhausted to TokenManager
+          const quotaResponse = await tokenManager.fetch(new Request("http://internal/reportQuotaExhausted", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ credentialId: context.id }),
+          }));
+          
+          const { hasAvailable } = await quotaResponse.json() as { hasAvailable: boolean };
+          
+          if (!hasAvailable) {
+            // All credentials exhausted
+            const errorEvent = formatSSE("error", {
+              error: {
+                type: "overloaded_error",
+                message: "All credentials have exhausted their quota",
+              },
+            });
+            await writer.write(encoder.encode(errorEvent));
+            await writer.close();
+            return;
+          }
+        } else {
+          // Report failure to TokenManager for other errors
+          await tokenManager.fetch(new Request("http://internal/reportFailure", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ credentialId: context.id }),
+          }));
+        }
         
         // **Validates: Requirement 13.1**
         const convertedError = convertKiroError(kiroResponse.status, errorText);

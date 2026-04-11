@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kiro Admin - 凭据管理</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        border: 'hsl(214.3 31.8% 91.4%)',
+                        input: 'hsl(214.3 31.8% 91.4%)',
+                        ring: 'hsl(222.2 84% 4.9%)',
+                        background: 'hsl(0 0% 100%)',
+                        foreground: 'hsl(222.2 84% 4.9%)',
+                        primary: {
+                            DEFAULT: 'hsl(222.2 47.4% 11.2%)',
+                            foreground: 'hsl(210 40% 98%)',
+                        },
+                        secondary: {
+                            DEFAULT: 'hsl(210 40% 96.1%)',
+                            foreground: 'hsl(222.2 47.4% 11.2%)',
+                        },
+                        destructive: {
+                            DEFAULT: 'hsl(0 84.2% 60.2%)',
+                            foreground: 'hsl(210 40% 98%)',
+                        },
+                        muted: {
+                            DEFAULT: 'hsl(210 40% 96.1%)',
+                            foreground: 'hsl(215.4 16.3% 46.9%)',
+                        },
+                        success: {
+                            DEFAULT: '#10b981',
+                            foreground: '#ffffff',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <link rel="stylesheet" href="/admin/styles.css">
+</head>
+<body class="bg-background text-foreground">
+    <!-- 登录页面 -->
+    <div id="login-page" class="min-h-screen flex items-center justify-center bg-background p-4">
+        <div class="w-full max-w-md">
+            <div class="bg-white dark:bg-card rounded-lg border border-border shadow-sm">
+                <div class="p-6 text-center">
+                    <div class="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
+                        <svg class="h-6 w-6 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+                        </svg>
+                    </div>
+                    <h1 class="text-2xl font-semibold mb-2">Kiro Admin</h1>
+                    <p class="text-sm text-muted-foreground mb-6">请输入 Admin API Key 以访问管理面板</p>
+                </div>
+                <div class="p-6 pt-0">
+                    <form id="login-form" class="space-y-4">
+                        <div class="space-y-2">
+                            <input 
+                                type="password" 
+                                id="admin-key" 
+                                placeholder="Admin API Key"
+                                class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 text-center"
+                                required
+                            >
+                        </div>
+                        <button type="submit" class="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2 w-full">
+                            登录
+                        </button>
+                        <div id="login-error" class="text-sm text-destructive text-center"></div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 管理面板页面 -->
+    <div id="dashboard-page" class="hidden min-h-screen bg-background">
+        <!-- 顶部导航 -->
+        <header class="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+            <div class="container flex h-14 items-center justify-between px-4 md:px-8 mx-auto max-w-7xl">
+                <div class="flex items-center gap-2">
+                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01" />
+                    </svg>
+                    <span class="font-semibold">Kiro Admin</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button id="dark-mode-btn" class="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 hover:bg-accent hover:text-accent-foreground h-10 w-10">
+                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+                        </svg>
+                    </button>
+                    <button id="refresh-btn" class="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 hover:bg-accent hover:text-accent-foreground h-10 w-10">
+                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                    </button>
+                    <button id="logout-btn" class="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 hover:bg-accent hover:text-accent-foreground h-10 w-10">
+                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- 主内容 -->
+        <main class="container px-4 md:px-8 py-6 mx-auto max-w-7xl">
+            <!-- 统计卡片 -->
+            <div class="grid gap-4 md:grid-cols-3 mb-6">
+                <div class="rounded-lg border bg-card text-card-foreground shadow-sm">
+                    <div class="p-6 flex flex-row items-center justify-between space-y-0 pb-2">
+                        <h3 class="tracking-tight text-sm font-medium text-muted-foreground">凭据总数</h3>
+                    </div>
+                    <div class="p-6 pt-0">
+                        <div id="total-count" class="text-2xl font-bold">0</div>
+                    </div>
+                </div>
+                <div class="rounded-lg border bg-card text-card-foreground shadow-sm">
+                    <div class="p-6 flex flex-row items-center justify-between space-y-0 pb-2">
+                        <h3 class="tracking-tight text-sm font-medium text-muted-foreground">可用凭据</h3>
+                    </div>
+                    <div class="p-6 pt-0">
+                        <div id="available-count" class="text-2xl font-bold text-success">0</div>
+                    </div>
+                </div>
+                <div class="rounded-lg border bg-card text-card-foreground shadow-sm">
+                    <div class="p-6 flex flex-row items-center justify-between space-y-0 pb-2">
+                        <h3 class="tracking-tight text-sm font-medium text-muted-foreground">当前活跃</h3>
+                    </div>
+                    <div class="p-6 pt-0">
+                        <div id="current-id" class="text-2xl font-bold flex items-center gap-2">
+                            <span>-</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 凭据列表 -->
+            <div class="space-y-4">
+                <div class="flex items-center justify-between">
+                    <h2 class="text-xl font-semibold">凭据管理</h2>
+                    <button id="add-credential-btn" class="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-4 py-2">
+                        <svg class="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                        </svg>
+                        添加凭据
+                    </button>
+                </div>
+                <div id="credentials-container" class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                    <div class="text-center text-muted-foreground py-8">加载中...</div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Toast 通知容器 -->
+    <div id="toast-container"></div>
+
+    <!-- 添加凭据对话框 (初始隐藏) -->
+    <div id="add-credential-dialog" class="hidden">
+        <div class="dialog-overlay"></div>
+        <div class="dialog-content w-full max-w-lg p-6">
+            <h2 class="text-lg font-semibold mb-4">添加凭据</h2>
+            <form id="add-credential-form" class="space-y-4">
+                <!-- Refresh Token -->
+                <div class="space-y-2">
+                    <label class="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                        Refresh Token <span class="text-destructive">*</span>
+                    </label>
+                    <input 
+                        type="password" 
+                        id="refresh-token" 
+                        placeholder="请输入 Refresh Token"
+                        class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                        required
+                    >
+                    <p class="text-xs text-muted-foreground">用于刷新 Access Token 的凭据</p>
+                </div>
+
+                <!-- 认证方式 -->
+                <div class="space-y-2">
+                    <label class="text-sm font-medium leading-none">认证方式</label>
+                    <select 
+                        id="auth-method"
+                        class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                        <option value="social">Social（社交账号登录）</option>
+                        <option value="idc">IdC/Builder-ID/IAM（企业身份认证）</option>
+                    </select>
+                    <p class="text-xs text-muted-foreground">选择与 Refresh Token 对应的认证方式</p>
+                </div>
+
+                <!-- Region -->
+                <div class="space-y-2">
+                    <label class="text-sm font-medium leading-none">Region（地域）</label>
+                    <input 
+                        type="text" 
+                        id="region" 
+                        placeholder="例如 us-east-1（留空则使用全局配置）"
+                        class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                    <p class="text-xs text-muted-foreground">用于 OIDC Token 刷新的 AWS 地域</p>
+                </div>
+
+                <!-- IdC 字段 (条件显示) -->
+                <div id="idc-fields" class="space-y-4 hidden">
+                    <div class="space-y-2">
+                        <label class="text-sm font-medium leading-none">
+                            Client ID <span class="text-destructive">*</span>
+                        </label>
+                        <input 
+                            type="text" 
+                            id="client-id" 
+                            placeholder="请输入 OIDC Client ID"
+                            class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                        <p class="text-xs text-muted-foreground">OIDC 应用的客户端标识符</p>
+                    </div>
+                    <div class="space-y-2">
+                        <label class="text-sm font-medium leading-none">
+                            Client Secret <span class="text-destructive">*</span>
+                        </label>
+                        <input 
+                            type="password" 
+                            id="client-secret" 
+                            placeholder="请输入 OIDC Client Secret"
+                            class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                        <p class="text-xs text-muted-foreground">OIDC 应用的客户端密钥</p>
+                    </div>
+                </div>
+
+                <!-- 优先级 -->
+                <div class="space-y-2">
+                    <label class="text-sm font-medium leading-none">优先级</label>
+                    <input 
+                        type="number" 
+                        id="priority" 
+                        placeholder="数字越小优先级越高"
+                        min="0"
+                        value="0"
+                        class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                    <p class="text-xs text-muted-foreground">数字越小优先级越高，默认为 0</p>
+                </div>
+
+                <!-- 按钮 -->
+                <div class="flex justify-end gap-2 pt-4">
+                    <button type="button" id="cancel-add-btn" class="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2">
+                        取消
+                    </button>
+                    <button type="submit" class="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2">
+                        添加
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="/admin/app-new.js"></script>
+</body>
+</html>

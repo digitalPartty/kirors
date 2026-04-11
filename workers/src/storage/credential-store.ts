@@ -7,7 +7,7 @@
  * **Validates: Requirements 18.1, 18.2, 18.3, 18.4, 18.5**
  */
 
-import type { Credential, CredentialInput } from "../types/kiro";
+import type { Credential, CredentialInput, CredentialsStatusResponse } from "../types/kiro";
 
 /**
  * Key prefix for credential storage in KV
@@ -28,17 +28,22 @@ export class CredentialStore {
   /**
    * List all credentials
    * 
-   * Returns all credentials sorted by priority (highest first).
-   * Disabled credentials are included in the list.
+   * Returns all credentials sorted by priority (lowest number = highest priority).
+   * Includes statistics about total, available, and current credential.
    * 
-   * @returns Array of all credentials
+   * @returns Credentials status response with statistics
    */
-  async list(): Promise<Credential[]> {
+  async list(): Promise<CredentialsStatusResponse> {
     // Get the list of credential IDs
     const idList = await this.kv.get<string[]>(CREDENTIAL_LIST_KEY, "json");
     
     if (!idList || idList.length === 0) {
-      return [];
+      return {
+        total: 0,
+        available: 0,
+        currentId: "",
+        credentials: [],
+      };
     }
 
     // Fetch all credentials in parallel
@@ -47,9 +52,36 @@ export class CredentialStore {
     );
 
     // Filter out null values (deleted credentials) and sort by priority
-    return credentials
+    const validCredentials = credentials
       .filter((cred): cred is Credential => cred !== null)
-      .sort((a, b) => b.priority - a.priority);
+      .sort((a, b) => a.priority - b.priority); // 数字越小优先级越高
+
+    // Calculate statistics
+    const total = validCredentials.length;
+    const available = validCredentials.filter(c => !c.disabled).length;
+    
+    // Find current credential (first non-disabled credential by priority)
+    const currentCredential = validCredentials.find(c => !c.disabled);
+    const currentId = currentCredential?.id || "";
+
+    // Convert to status items
+    const credentialItems = validCredentials.map(cred => ({
+      id: cred.id,
+      priority: cred.priority,
+      disabled: cred.disabled,
+      failureCount: cred.failureCount,
+      isCurrent: cred.id === currentId,
+      expiresAt: cred.expiresAt,
+      authMethod: cred.authMethod,
+      hasProfileArn: !!cred.profileArn,
+    }));
+
+    return {
+      total,
+      available,
+      currentId,
+      credentials: credentialItems,
+    };
   }
 
   /**
@@ -78,15 +110,18 @@ export class CredentialStore {
 
     const credential: Credential = {
       id,
-      name: input.name,
+      refreshToken: input.refreshToken,
+      accessToken: undefined,
+      profileArn: undefined,
+      expiresAt: undefined,
+      authMethod: input.authMethod || "social",
       clientId: input.clientId,
       clientSecret: input.clientSecret,
-      refreshToken: input.refreshToken,
-      accessToken: input.accessToken || "",
-      expiresAt: input.expiresAt || 0,
       priority: input.priority ?? 0,
       disabled: false,
       failureCount: 0,
+      region: input.region,
+      machineId: input.machineId,
       createdAt: now,
       updatedAt: now,
     };
